@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 set -euo pipefail
 
 LABEL="${LABEL:-com.selfcontrol-automation.start}"

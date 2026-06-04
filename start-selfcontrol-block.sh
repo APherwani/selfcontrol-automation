@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 set -euo pipefail
 
 default_control_uid() {
@@ -14,6 +14,7 @@ SELFCONTROL_CLI="${SELFCONTROL_CLI:-${SELFCONTROL_APP}/Contents/MacOS/selfcontro
 CONTROL_UID="${CONTROL_UID:-$(default_control_uid)}"
 END_TIME=""
 DRY_RUN=0
+TIME_RE='^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
 
 log() {
   /bin/echo "[$(/bin/date '+%Y-%m-%d %H:%M:%S %z')] $*"
@@ -53,7 +54,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -n "${END_TIME}" && ! "${END_TIME}" =~ '^([01]?[0-9]|2[0-3]):[0-5][0-9]$' ]]; then
+if [[ -n "${END_TIME}" && ! ${END_TIME} =~ ${TIME_RE} ]]; then
   log "ERROR: --until must be HH:MM in 24-hour time, like 17:00."
   exit 64
 fi

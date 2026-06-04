@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 set -euo pipefail
 
 default_control_uid() {
@@ -89,13 +89,14 @@ fi
 START_TIME="$1"
 END_TIME="$2"
 CADENCE="${3:-daily}"
+TIME_RE='^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
 
-if [[ ! "${START_TIME}" =~ '^([01]?[0-9]|2[0-3]):[0-5][0-9]$' ]]; then
+if [[ ! ${START_TIME} =~ ${TIME_RE} ]]; then
   /bin/echo "ERROR: Start time must be HH:MM in 24-hour time, like 09:00." >&2
   exit 64
 fi
 
-if [[ ! "${END_TIME}" =~ '^([01]?[0-9]|2[0-3]):[0-5][0-9]$' ]]; then
+if [[ ! ${END_TIME} =~ ${TIME_RE} ]]; then
   /bin/echo "ERROR: End time must be HH:MM in 24-hour time, like 17:00." >&2
   exit 64
 fi
