@@ -22,6 +22,8 @@ PLIST_DEST="/Library/LaunchDaemons/${LABEL}.plist"
 CONTROL_UID="${CONTROL_UID:-$(default_control_uid)}"
 CONTROL_HOME="${CONTROL_HOME:-$(home_for_uid "${CONTROL_UID}" 2>/dev/null || /bin/echo "${HOME}")}"
 LOG_PATH="${LOG_PATH:-/var/log/selfcontrol-automation.log}"
+SELFCONTROL_HELPER_LABEL="${SELFCONTROL_HELPER_LABEL:-org.eyebeam.selfcontrold}"
+SELFCONTROL_HELPER_PLIST="${SELFCONTROL_HELPER_PLIST:-/Library/LaunchDaemons/${SELFCONTROL_HELPER_LABEL}.plist}"
 
 usage() {
   /bin/cat <<'EOF'
@@ -79,6 +81,28 @@ remove_other_jobs_for_runner() {
       /usr/bin/sudo /bin/rm -f "${plist}"
     fi
   done
+}
+
+ensure_selfcontrol_helper_loaded() {
+  if [[ ! -f "${SELFCONTROL_HELPER_PLIST}" ]]; then
+    /bin/echo "ERROR: SelfControl helper plist not found at ${SELFCONTROL_HELPER_PLIST}." >&2
+    /bin/echo "Open SelfControl once and approve its helper installation if prompted, then run this installer again." >&2
+    exit 1
+  fi
+
+  if /bin/launchctl print "system/${SELFCONTROL_HELPER_LABEL}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  /bin/echo "Loading SelfControl privileged helper ${SELFCONTROL_HELPER_LABEL}."
+  /usr/bin/sudo /bin/launchctl bootstrap system "${SELFCONTROL_HELPER_PLIST}" 2>/dev/null || true
+  /usr/bin/sudo /bin/launchctl enable "system/${SELFCONTROL_HELPER_LABEL}" 2>/dev/null || true
+
+  if ! /bin/launchctl print "system/${SELFCONTROL_HELPER_LABEL}" >/dev/null 2>&1; then
+    /bin/echo "ERROR: SelfControl privileged helper is not loaded." >&2
+    /bin/echo "Try opening SelfControl once and approving its helper installation, then run this installer again." >&2
+    exit 1
+  fi
 }
 
 if [[ $# -lt 2 || $# -gt 3 ]]; then
@@ -203,6 +227,7 @@ EOF
 /usr/bin/sudo /bin/mkdir -p "$(/usr/bin/dirname "${SCRIPT_DEST}")"
 /usr/bin/sudo /usr/bin/install -m 0755 -o root -g wheel "${SCRIPT_SOURCE}" "${SCRIPT_DEST}"
 /usr/bin/sudo /usr/bin/install -m 0644 -o root -g wheel "${TMP_PLIST}" "${PLIST_DEST}"
+ensure_selfcontrol_helper_loaded
 remove_other_jobs_for_runner
 /usr/bin/sudo /bin/launchctl bootout system "${PLIST_DEST}" 2>/dev/null || true
 /usr/bin/sudo /bin/launchctl bootstrap system "${PLIST_DEST}"

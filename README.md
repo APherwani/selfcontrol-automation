@@ -81,6 +81,31 @@ Watch the automation log with:
 tail -f /var/log/selfcontrol-automation.log
 ```
 
+## Troubleshooting
+
+If the scheduled job runs but the log says SelfControl failed to authorize or install its helper, load SelfControl's helper and rerun the installer:
+
+```zsh
+sudo launchctl bootstrap system /Library/LaunchDaemons/org.eyebeam.selfcontrold.plist
+sudo launchctl enable system/org.eyebeam.selfcontrold
+./install-selfcontrol-automation.sh 09:00 17:00 weekdays
+```
+
+To confirm both jobs are loaded:
+
+```zsh
+launchctl print system/org.eyebeam.selfcontrold
+launchctl print system/com.selfcontrol-automation.start
+```
+
+If the 9am run was missed or failed and you want to start today's block immediately, run:
+
+```zsh
+sudo launchctl kickstart -k system/com.selfcontrol-automation.start
+```
+
+That starts a real SelfControl block using the installed schedule's end time.
+
 ## Remove
 
 ```zsh
