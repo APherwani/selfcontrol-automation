@@ -8,7 +8,7 @@ SelfControl's own command-line helper is used:
 /Users/arjun/Applications/SelfControl.app/Contents/MacOS/selfcontrol-cli
 ```
 
-The scheduled block uses the blocklist and duration already saved in the SelfControl app. On this Mac, those settings currently show a 300-minute block and this blocklist:
+The scheduled block uses the blocklist already saved in the SelfControl app, while the automation decides the end time. On this Mac, the saved SelfControl blocklist is currently:
 
 ```text
 chess.com
@@ -20,10 +20,10 @@ x.com
 
 ## Install
 
-Choose a 24-hour start time and cadence:
+Choose 24-hour start/end times and a cadence:
 
 ```zsh
-./install-selfcontrol-automation.sh 09:00 weekdays
+./install-selfcontrol-automation.sh 09:00 17:00 weekdays
 ```
 
 Supported cadences:
@@ -51,7 +51,7 @@ It also installs the runner script at:
 Run the installer again with a new time or cadence:
 
 ```zsh
-./install-selfcontrol-automation.sh 22:30 daily
+./install-selfcontrol-automation.sh 10:00 16:00 weekdays
 ```
 
 ## Remove
@@ -60,8 +60,18 @@ Run the installer again with a new time or cadence:
 ./uninstall-selfcontrol-automation.sh
 ```
 
+This only removes the scheduled automation and installed runner script. It does not stop, shorten, or undo any SelfControl block that is already running.
+
 ## Logs
 
 ```zsh
 tail -f /var/log/selfcontrol-automation.log
+```
+
+## Dry Run
+
+To verify the generated blocklist and end time without starting a block:
+
+```zsh
+./start-selfcontrol-block.sh --dry-run --until 17:00
 ```

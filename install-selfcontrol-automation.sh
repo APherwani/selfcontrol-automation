@@ -9,31 +9,37 @@ PLIST_DEST="/Library/LaunchDaemons/${LABEL}.plist"
 usage() {
   /bin/cat <<'EOF'
 Usage:
-  ./install-selfcontrol-automation.sh HH:MM [daily|weekdays|weekends]
+  ./install-selfcontrol-automation.sh START_HH:MM END_HH:MM [daily|weekdays|weekends]
 
 Examples:
-  ./install-selfcontrol-automation.sh 09:00 weekdays
-  ./install-selfcontrol-automation.sh 22:30 daily
+  ./install-selfcontrol-automation.sh 09:00 17:00 weekdays
+  ./install-selfcontrol-automation.sh 22:30 23:59 daily
 
-The scheduled block uses your existing SelfControl app blocklist and duration.
+The scheduled block uses your existing SelfControl app blocklist and ends at END_HH:MM.
 EOF
 }
 
-if [[ $# -lt 1 || $# -gt 2 ]]; then
+if [[ $# -lt 2 || $# -gt 3 ]]; then
   usage
   exit 64
 fi
 
-TIME_ARG="$1"
-CADENCE="${2:-daily}"
+START_TIME="$1"
+END_TIME="$2"
+CADENCE="${3:-daily}"
 
-if [[ ! "${TIME_ARG}" =~ '^([01]?[0-9]|2[0-3]):[0-5][0-9]$' ]]; then
-  /bin/echo "ERROR: Time must be HH:MM in 24-hour time, like 09:00 or 22:30." >&2
+if [[ ! "${START_TIME}" =~ '^([01]?[0-9]|2[0-3]):[0-5][0-9]$' ]]; then
+  /bin/echo "ERROR: Start time must be HH:MM in 24-hour time, like 09:00." >&2
   exit 64
 fi
 
-HOUR="${TIME_ARG%%:*}"
-MINUTE="${TIME_ARG##*:}"
+if [[ ! "${END_TIME}" =~ '^([01]?[0-9]|2[0-3]):[0-5][0-9]$' ]]; then
+  /bin/echo "ERROR: End time must be HH:MM in 24-hour time, like 17:00." >&2
+  exit 64
+fi
+
+HOUR="${START_TIME%%:*}"
+MINUTE="${START_TIME##*:}"
 HOUR="$((10#${HOUR}))"
 MINUTE="$((10#${MINUTE}))"
 
@@ -88,7 +94,19 @@ trap '/bin/rm -f "${TMP_PLIST}"' EXIT
   <key>ProgramArguments</key>
   <array>
     <string>${SCRIPT_DEST}</string>
+    <string>--until</string>
+    <string>${END_TIME}</string>
   </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>CONTROL_UID</key>
+    <string>501</string>
+    <key>CONTROL_HOME</key>
+    <string>/Users/arjun</string>
+    <key>SELFCONTROL_APP</key>
+    <string>/Users/arjun/Applications/SelfControl.app</string>
+  </dict>
 
   <key>StartCalendarInterval</key>
   <array>${CALENDAR_XML}
@@ -112,5 +130,5 @@ EOF
 /usr/bin/sudo /bin/launchctl bootstrap system "${PLIST_DEST}"
 /usr/bin/sudo /bin/launchctl enable "system/${LABEL}"
 
-/bin/echo "Installed. SelfControl will start ${CADENCE} at ${TIME_ARG}."
+/bin/echo "Installed. SelfControl will run ${CADENCE} from ${START_TIME} to ${END_TIME}."
 /bin/echo "Logs: /var/log/selfcontrol-automation.log"
