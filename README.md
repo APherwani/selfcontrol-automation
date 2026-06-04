@@ -87,7 +87,7 @@ tail -f /var/log/selfcontrol-automation.log
 ./uninstall-selfcontrol-automation.sh
 ```
 
-This only removes the scheduled automation and installed runner script. It does not stop, shorten, or undo any SelfControl block that is already running.
+This only removes the scheduled automation and installed runner script. It does not stop, shorten, or undo any SelfControl block that is already running. This is on purpose.
 
 ## Logs
 
