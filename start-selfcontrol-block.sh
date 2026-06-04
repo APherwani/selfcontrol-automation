@@ -1,9 +1,17 @@
 #!/bin/zsh
 set -euo pipefail
 
-SELFCONTROL_APP="${SELFCONTROL_APP:-/Users/arjun/Applications/SelfControl.app}"
+default_control_uid() {
+  if [[ -n "${SUDO_UID:-}" && "${SUDO_UID}" != "0" ]]; then
+    /bin/echo "${SUDO_UID}"
+  else
+    /usr/bin/id -u
+  fi
+}
+
+SELFCONTROL_APP="${SELFCONTROL_APP:-/Applications/SelfControl.app}"
 SELFCONTROL_CLI="${SELFCONTROL_CLI:-${SELFCONTROL_APP}/Contents/MacOS/selfcontrol-cli}"
-CONTROL_UID="${CONTROL_UID:-501}"
+CONTROL_UID="${CONTROL_UID:-$(default_control_uid)}"
 END_TIME=""
 DRY_RUN=0
 

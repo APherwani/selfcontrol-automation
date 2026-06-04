@@ -2,21 +2,13 @@
 
 This workspace contains a small macOS `launchd` automation for starting the SelfControl app automatically.
 
-SelfControl's own command-line helper is used:
+SelfControl's own command-line helper is used. The installer looks for `SelfControl.app` in `/Applications`, `~/Applications`, and `~/Downloads`.
 
-```zsh
-/Users/arjun/Applications/SelfControl.app/Contents/MacOS/selfcontrol-cli
-```
+If your app lives somewhere else, pass `SELFCONTROL_APP` when installing.
 
-The scheduled block uses the blocklist already saved in the SelfControl app, while the automation decides the end time. On this Mac, the saved SelfControl blocklist is currently:
+The scheduled block uses the blocklist already saved in the SelfControl app, while the automation decides the end time.
 
-```text
-chess.com
-lichess.com
-youtube.com
-instagram.com
-x.com
-```
+The installer records the current user's UID and home directory in the LaunchDaemon so SelfControl reads the right preferences when the scheduled job runs as root.
 
 ## Install
 
@@ -37,7 +29,7 @@ weekends
 Because SelfControl needs administrator privileges to start blocks reliably without a password prompt later, the installer creates a root LaunchDaemon in:
 
 ```text
-/Library/LaunchDaemons/com.arjun.selfcontrol.start.plist
+/Library/LaunchDaemons/com.selfcontrol-automation.start.plist
 ```
 
 It also installs the runner script at:
@@ -52,6 +44,12 @@ Run the installer again with a new time or cadence:
 
 ```zsh
 ./install-selfcontrol-automation.sh 10:00 16:00 weekdays
+```
+
+For a non-standard app location:
+
+```zsh
+SELFCONTROL_APP="$HOME/Apps/SelfControl.app" ./install-selfcontrol-automation.sh 09:00 17:00 weekdays
 ```
 
 ## Remove
