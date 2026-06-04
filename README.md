@@ -1,6 +1,6 @@
 # SelfControl Scheduled Start
 
-This workspace contains a small macOS `launchd` automation for starting the SelfControl app automatically.
+This repo contains a small macOS `launchd` automation for starting the SelfControl app automatically.
 
 SelfControl's own command-line helper is used. The installer looks for `SelfControl.app` in `/Applications`, `~/Applications`, and `~/Downloads`.
 
@@ -12,9 +12,19 @@ The installer records the current user's UID and home directory in a LaunchAgent
 
 ## Safety Warning
 
-Read the scripts before running. The current installer writes a user LaunchAgent to `~/Library/LaunchAgents` and a runner script to `~/Library/Application Support/selfcontrol-automation`.
+Read the scripts before running.
 
-If you are upgrading from an older version, the installer may ask for `sudo` so it can remove the previous root LaunchDaemon from `/Library/LaunchDaemons` and the old runner from `/usr/local/bin`.
+The current installer writes user-owned files to:
+
+```text
+~/Library/LaunchAgents/com.selfcontrol-automation.start.plist
+~/Library/Application Support/selfcontrol-automation/start-selfcontrol-block
+~/Library/Logs/selfcontrol-automation.log
+```
+
+It does not install a root-owned scheduler. SelfControl itself uses its own privileged helper, `org.eyebeam.selfcontrold`, to apply blocks. macOS may ask for an administrator password the first time SelfControl installs or authorizes that helper.
+
+If you are upgrading from an older version of this repo, the installer may ask for `sudo` only to remove the previous root LaunchDaemon from `/Library/LaunchDaemons` and the old runner from `/usr/local/bin`.
 
 This project is intentionally small so the privileged behavior is easy to audit. The uninstall script removes the scheduled automation and installed runner, but it does not stop, shorten, or undo any SelfControl block that is already running.
 
@@ -45,6 +55,25 @@ It also installs the runner script at:
 ```text
 ~/Library/Application Support/selfcontrol-automation/start-selfcontrol-block
 ```
+
+## Upgrade From Old Root Daemon
+
+Older versions installed a root LaunchDaemon. The current version uses a user LaunchAgent because SelfControl's CLI needs to run in your login session after its helper has been authorized.
+
+Run the installer again to migrate:
+
+```zsh
+./install-selfcontrol-automation.sh 09:00 17:00 weekdays
+```
+
+If macOS asks for a password during migration, it is removing these old root-owned files:
+
+```text
+/Library/LaunchDaemons/com.selfcontrol-automation.start.plist
+/usr/local/bin/start-selfcontrol-block
+```
+
+Removing those files does not stop, shorten, or undo an active SelfControl block.
 
 ## Change The Schedule
 
