@@ -8,11 +8,13 @@ If your app lives somewhere else, pass `SELFCONTROL_APP` when installing.
 
 The scheduled block uses the blocklist already saved in the SelfControl app, while the automation decides the end time.
 
-The installer records the current user's UID and home directory in the LaunchDaemon so SelfControl reads the right preferences when the scheduled job runs as root.
+The installer records the current user's UID and home directory in a LaunchAgent so SelfControl reads the right preferences when the scheduled job runs in your login session.
 
 ## Safety Warning
 
-Read the scripts before running; this writes to `/Library/LaunchDaemons` and `/usr/local/bin`. The installer uses `sudo` to create root-owned files in those locations.
+Read the scripts before running. The current installer writes a user LaunchAgent to `~/Library/LaunchAgents` and a runner script to `~/Library/Application Support/selfcontrol-automation`.
+
+If you are upgrading from an older version, the installer may ask for `sudo` so it can remove the previous root LaunchDaemon from `/Library/LaunchDaemons` and the old runner from `/usr/local/bin`.
 
 This project is intentionally small so the privileged behavior is easy to audit. The uninstall script removes the scheduled automation and installed runner, but it does not stop, shorten, or undo any SelfControl block that is already running.
 
@@ -32,16 +34,16 @@ weekdays
 weekends
 ```
 
-Because SelfControl needs administrator privileges to start blocks reliably without a password prompt later, the installer creates a root LaunchDaemon in:
+The installer creates a user LaunchAgent in:
 
 ```text
-/Library/LaunchDaemons/com.selfcontrol-automation.start.plist
+~/Library/LaunchAgents/com.selfcontrol-automation.start.plist
 ```
 
 It also installs the runner script at:
 
 ```text
-/usr/local/bin/start-selfcontrol-block
+~/Library/Application Support/selfcontrol-automation/start-selfcontrol-block
 ```
 
 ## Change The Schedule
@@ -69,25 +71,23 @@ Installing a weekday 9-to-5 schedule looks like this:
 Expected output:
 
 ```text
-Installing /usr/local/bin/start-selfcontrol-block and /Library/LaunchDaemons/com.selfcontrol-automation.start.plist; macOS may ask for your password.
+Installing /Users/you/Library/Application Support/selfcontrol-automation/start-selfcontrol-block and /Users/you/Library/LaunchAgents/com.selfcontrol-automation.start.plist.
 Installed. SelfControl will run weekdays from 09:00 to 17:00.
 SelfControl app: /Applications/SelfControl.app
-Logs: /var/log/selfcontrol-automation.log
+Logs: /Users/you/Library/Logs/selfcontrol-automation.log
 ```
 
 Watch the automation log with:
 
 ```zsh
-tail -f /var/log/selfcontrol-automation.log
+tail -f "$HOME/Library/Logs/selfcontrol-automation.log"
 ```
 
 ## Troubleshooting
 
-If the scheduled job runs but the log says SelfControl failed to authorize or install its helper, load SelfControl's helper and rerun the installer:
+If the scheduled job runs but the log says SelfControl failed to authorize or install its helper, open SelfControl once and approve its helper installation if prompted. Then rerun the installer:
 
 ```zsh
-sudo launchctl bootstrap system /Library/LaunchDaemons/org.eyebeam.selfcontrold.plist
-sudo launchctl enable system/org.eyebeam.selfcontrold
 ./install-selfcontrol-automation.sh 09:00 17:00 weekdays
 ```
 
@@ -95,13 +95,13 @@ To confirm both jobs are loaded:
 
 ```zsh
 launchctl print system/org.eyebeam.selfcontrold
-launchctl print system/com.selfcontrol-automation.start
+launchctl print "gui/$(id -u)/com.selfcontrol-automation.start"
 ```
 
 If the 9am run was missed or failed and you want to start today's block immediately, run:
 
 ```zsh
-sudo launchctl kickstart -k system/com.selfcontrol-automation.start
+launchctl kickstart -k "gui/$(id -u)/com.selfcontrol-automation.start"
 ```
 
 That starts a real SelfControl block using the installed schedule's end time.
@@ -117,7 +117,7 @@ This only removes the scheduled automation and installed runner script. It does 
 ## Logs
 
 ```zsh
-tail -f /var/log/selfcontrol-automation.log
+tail -f "$HOME/Library/Logs/selfcontrol-automation.log"
 ```
 
 ## Dry Run

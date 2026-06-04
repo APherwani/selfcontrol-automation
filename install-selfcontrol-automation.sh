@@ -15,15 +15,19 @@ home_for_uid() {
   /usr/bin/dscl . -read "/Users/${user}" NFSHomeDirectory | /usr/bin/awk '{print $2}'
 }
 
-LABEL="${LABEL:-com.selfcontrol-automation.start}"
-SCRIPT_SOURCE="$(cd "$(dirname "$0")" && pwd)/start-selfcontrol-block.sh"
-SCRIPT_DEST="${SCRIPT_DEST:-/usr/local/bin/start-selfcontrol-block}"
-PLIST_DEST="/Library/LaunchDaemons/${LABEL}.plist"
 CONTROL_UID="${CONTROL_UID:-$(default_control_uid)}"
 CONTROL_HOME="${CONTROL_HOME:-$(home_for_uid "${CONTROL_UID}" 2>/dev/null || /bin/echo "${HOME}")}"
-LOG_PATH="${LOG_PATH:-/var/log/selfcontrol-automation.log}"
+LABEL="${LABEL:-com.selfcontrol-automation.start}"
+SCRIPT_SOURCE="$(cd "$(dirname "$0")" && pwd)/start-selfcontrol-block.sh"
+INSTALL_DIR="${INSTALL_DIR:-${CONTROL_HOME}/Library/Application Support/selfcontrol-automation}"
+SCRIPT_DEST="${SCRIPT_DEST:-${INSTALL_DIR}/start-selfcontrol-block}"
+PLIST_DEST="${PLIST_DEST:-${CONTROL_HOME}/Library/LaunchAgents/${LABEL}.plist}"
+LOG_PATH="${LOG_PATH:-${CONTROL_HOME}/Library/Logs/selfcontrol-automation.log}"
+LAUNCH_DOMAIN="gui/${CONTROL_UID}"
 SELFCONTROL_HELPER_LABEL="${SELFCONTROL_HELPER_LABEL:-org.eyebeam.selfcontrold}"
 SELFCONTROL_HELPER_PLIST="${SELFCONTROL_HELPER_PLIST:-/Library/LaunchDaemons/${SELFCONTROL_HELPER_LABEL}.plist}"
+LEGACY_SCRIPT_DEST="${LEGACY_SCRIPT_DEST:-/usr/local/bin/start-selfcontrol-block}"
+LEGACY_PLIST_DEST="${LEGACY_PLIST_DEST:-/Library/LaunchDaemons/${LABEL}.plist}"
 
 usage() {
   /bin/cat <<'EOF'
@@ -66,10 +70,10 @@ detect_selfcontrol_app() {
   return 1
 }
 
-remove_other_jobs_for_runner() {
+remove_other_user_jobs_for_runner() {
   local plist label program
 
-  for plist in /Library/LaunchDaemons/*.plist; do
+  for plist in "${CONTROL_HOME}/Library/LaunchAgents/"*.plist; do
     [[ -e "${plist}" ]] || continue
 
     label="$(/usr/bin/plutil -extract Label raw -o - "${plist}" 2>/dev/null || true)"
@@ -77,32 +81,38 @@ remove_other_jobs_for_runner() {
 
     if [[ -n "${label}" && "${label}" != "${LABEL}" && "${program}" == "${SCRIPT_DEST}" ]]; then
       /bin/echo "Removing old SelfControl automation job ${label}."
-      /usr/bin/sudo /bin/launchctl bootout system "${plist}" 2>/dev/null || true
-      /usr/bin/sudo /bin/rm -f "${plist}"
+      /bin/launchctl bootout "${LAUNCH_DOMAIN}" "${plist}" 2>/dev/null || true
+      /bin/rm -f "${plist}"
     fi
   done
 }
 
-ensure_selfcontrol_helper_loaded() {
+remove_legacy_system_job() {
+  if [[ -f "${LEGACY_PLIST_DEST}" ]]; then
+    /bin/echo "Removing old root LaunchDaemon ${LEGACY_PLIST_DEST}; macOS may ask for your password."
+    /usr/bin/sudo /bin/launchctl bootout system "${LEGACY_PLIST_DEST}" 2>/dev/null || true
+    /usr/bin/sudo /bin/rm -f "${LEGACY_PLIST_DEST}"
+  fi
+
+  if [[ -f "${LEGACY_SCRIPT_DEST}" && "${LEGACY_SCRIPT_DEST}" != "${SCRIPT_DEST}" ]]; then
+    /bin/echo "Removing old root runner ${LEGACY_SCRIPT_DEST}; macOS may ask for your password."
+    /usr/bin/sudo /bin/rm -f "${LEGACY_SCRIPT_DEST}"
+  fi
+}
+
+warn_if_selfcontrol_helper_not_loaded() {
   if [[ ! -f "${SELFCONTROL_HELPER_PLIST}" ]]; then
-    /bin/echo "ERROR: SelfControl helper plist not found at ${SELFCONTROL_HELPER_PLIST}." >&2
-    /bin/echo "Open SelfControl once and approve its helper installation if prompted, then run this installer again." >&2
-    exit 1
+    /bin/echo "WARNING: SelfControl helper plist was not found at ${SELFCONTROL_HELPER_PLIST}." >&2
+    /bin/echo "Open SelfControl once and approve its helper installation if prompted." >&2
+    return 0
   fi
 
   if /bin/launchctl print "system/${SELFCONTROL_HELPER_LABEL}" >/dev/null 2>&1; then
     return 0
   fi
 
-  /bin/echo "Loading SelfControl privileged helper ${SELFCONTROL_HELPER_LABEL}."
-  /usr/bin/sudo /bin/launchctl bootstrap system "${SELFCONTROL_HELPER_PLIST}" 2>/dev/null || true
-  /usr/bin/sudo /bin/launchctl enable "system/${SELFCONTROL_HELPER_LABEL}" 2>/dev/null || true
-
-  if ! /bin/launchctl print "system/${SELFCONTROL_HELPER_LABEL}" >/dev/null 2>&1; then
-    /bin/echo "ERROR: SelfControl privileged helper is not loaded." >&2
-    /bin/echo "Try opening SelfControl once and approving its helper installation, then run this installer again." >&2
-    exit 1
-  fi
+  /bin/echo "WARNING: SelfControl privileged helper is not currently loaded." >&2
+  /bin/echo "The first scheduled start may show a macOS authorization prompt unless SelfControl has already installed its helper." >&2
 }
 
 if [[ $# -lt 2 || $# -gt 3 ]]; then
@@ -223,15 +233,16 @@ EOF
 
 /usr/bin/plutil -lint "${TMP_PLIST}" >/dev/null
 
-/bin/echo "Installing ${SCRIPT_DEST} and ${PLIST_DEST}; macOS may ask for your password."
-/usr/bin/sudo /bin/mkdir -p "$(/usr/bin/dirname "${SCRIPT_DEST}")"
-/usr/bin/sudo /usr/bin/install -m 0755 -o root -g wheel "${SCRIPT_SOURCE}" "${SCRIPT_DEST}"
-/usr/bin/sudo /usr/bin/install -m 0644 -o root -g wheel "${TMP_PLIST}" "${PLIST_DEST}"
-ensure_selfcontrol_helper_loaded
-remove_other_jobs_for_runner
-/usr/bin/sudo /bin/launchctl bootout system "${PLIST_DEST}" 2>/dev/null || true
-/usr/bin/sudo /bin/launchctl bootstrap system "${PLIST_DEST}"
-/usr/bin/sudo /bin/launchctl enable "system/${LABEL}"
+/bin/echo "Installing ${SCRIPT_DEST} and ${PLIST_DEST}."
+/bin/mkdir -p "$(/usr/bin/dirname "${SCRIPT_DEST}")" "$(/usr/bin/dirname "${PLIST_DEST}")" "$(/usr/bin/dirname "${LOG_PATH}")"
+/usr/bin/install -m 0755 "${SCRIPT_SOURCE}" "${SCRIPT_DEST}"
+/usr/bin/install -m 0644 "${TMP_PLIST}" "${PLIST_DEST}"
+warn_if_selfcontrol_helper_not_loaded
+remove_other_user_jobs_for_runner
+remove_legacy_system_job
+/bin/launchctl bootout "${LAUNCH_DOMAIN}" "${PLIST_DEST}" 2>/dev/null || true
+/bin/launchctl bootstrap "${LAUNCH_DOMAIN}" "${PLIST_DEST}"
+/bin/launchctl enable "${LAUNCH_DOMAIN}/${LABEL}"
 
 /bin/echo "Installed. SelfControl will run ${CADENCE} from ${START_TIME} to ${END_TIME}."
 /bin/echo "SelfControl app: ${SELFCONTROL_APP}"
