@@ -2,6 +2,19 @@
 
 This repo contains a small macOS `launchd` automation prototype for starting the SelfControl app automatically.
 
+## Recommendation
+
+If you just want scheduled focus blocks on macOS, use [Raycast Focus](https://www.raycast.com/core-features/focus) instead of this repo.
+
+Raycast Focus is free, maintained, and built into Raycast. It can block apps and websites, supports custom categories, works through Raycast deeplinks, and integrates with macOS Focus Filters. It also avoids this repo's hardest problem: trying to drive SelfControl's privileged helper and macOS authorization flow from an unattended shell script.
+
+Useful Raycast docs:
+
+- [Raycast Focus manual](https://manual.raycast.com/focus)
+- [Raycast Focus Filters](https://manual.raycast.com/focus/how-to-create-a-focus-filter/)
+
+This repo is best treated as a reference or learning artifact. It is not the recommended path for a reliable daily focus setup.
+
 ## Current Status
 
 This project is experimental and may not reliably start unattended blocks on current versions of SelfControl.
@@ -40,7 +53,7 @@ This project is intentionally small so the privileged behavior is easy to audit.
 
 ## Install
 
-Only install this if you understand the limitation above: installation success means the scheduler was installed, not that unattended SelfControl starts are guaranteed to work.
+Most users should not install this. Use Raycast Focus unless you specifically want to experiment with SelfControl automation and understand the limitation above: installation success means the scheduler was installed, not that unattended SelfControl starts are guaranteed to work.
 
 Choose 24-hour start/end times and a cadence:
 
