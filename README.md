@@ -1,6 +1,16 @@
 # SelfControl Scheduled Start
 
-This repo contains a small macOS `launchd` automation for starting the SelfControl app automatically.
+This repo contains a small macOS `launchd` automation prototype for starting the SelfControl app automatically.
+
+## Current Status
+
+This project is experimental and may not reliably start unattended blocks on current versions of SelfControl.
+
+The `launchd` schedule can fire at the right time, but SelfControl 4's CLI still goes through macOS Authorization Services before starting a block. In particular, it may try to authorize or reinstall SelfControl's privileged helper, `org.eyebeam.selfcontrold`, and acquire SelfControl's `startBlock` authorization right. Those steps are designed for an interactive user session. When the command is launched automatically by `launchd`, macOS may refuse, delay, or hide that authorization flow.
+
+That means this repo can correctly install a LaunchAgent and still fail to start the actual SelfControl block at 9am. Do not rely on it as your only enforcement mechanism.
+
+The likely durable fix is upstream or app-level work in SelfControl itself: scheduled starts need to be part of SelfControl's own app/helper model, not an outside shell wrapper fighting the authorization layer.
 
 SelfControl's own command-line helper is used. The installer looks for `SelfControl.app` in `/Applications`, `~/Applications`, and `~/Downloads`.
 
@@ -29,6 +39,8 @@ If you are upgrading from an older version of this repo, the installer may ask f
 This project is intentionally small so the privileged behavior is easy to audit. The uninstall script removes the scheduled automation and installed runner, but it does not stop, shorten, or undo any SelfControl block that is already running.
 
 ## Install
+
+Only install this if you understand the limitation above: installation success means the scheduler was installed, not that unattended SelfControl starts are guaranteed to work.
 
 Choose 24-hour start/end times and a cadence:
 
@@ -97,7 +109,7 @@ Installing a weekday 9-to-5 schedule looks like this:
 ./install-selfcontrol-automation.sh 09:00 17:00 weekdays
 ```
 
-Expected output:
+The installer currently prints output like:
 
 ```text
 Installing /Users/you/Library/Application Support/selfcontrol-automation/start-selfcontrol-block and /Users/you/Library/LaunchAgents/com.selfcontrol-automation.start.plist.
@@ -105,6 +117,8 @@ Installed. SelfControl will run weekdays from 09:00 to 17:00.
 SelfControl app: /Applications/SelfControl.app
 Logs: /Users/you/Library/Logs/selfcontrol-automation.log
 ```
+
+This output only confirms that the LaunchAgent was installed.
 
 Watch the automation log with:
 
@@ -114,11 +128,23 @@ tail -f "$HOME/Library/Logs/selfcontrol-automation.log"
 
 ## Troubleshooting
 
-If the scheduled job runs but the log says SelfControl failed to authorize or install its helper, open SelfControl once and approve its helper installation if prompted. Then rerun the installer:
+If the scheduled job runs but the log says SelfControl failed to authorize or install its helper, the LaunchAgent probably did its part and SelfControl failed during macOS authorization.
+
+Common failing log lines look like:
+
+```text
+ERROR: Failed to authorize installing selfcontrold with status -60005.
+ERROR: Failed to authorize installing selfcontrold with status -60007.
+There was an error authorizing the installation of SelfControl's helper tool.
+```
+
+You can try opening SelfControl once and approving its helper installation if prompted. Then rerun the installer:
 
 ```zsh
 ./install-selfcontrol-automation.sh 09:00 17:00 weekdays
 ```
+
+This may still not be enough for fully unattended scheduled starts. SelfControl's CLI can request authorization again when the scheduled command runs.
 
 To confirm both jobs are loaded:
 
@@ -133,7 +159,9 @@ If the 9am run was missed or failed and you want to start today's block immediat
 launchctl kickstart -k "gui/$(id -u)/com.selfcontrol-automation.start"
 ```
 
-That starts a real SelfControl block using the installed schedule's end time.
+That asks `launchd` to run the installed job immediately. It can still hit the same SelfControl authorization problem.
+
+If `launchctl print "gui/$(id -u)/com.selfcontrol-automation.start"` shows the job ran but exited with `70: EX_SOFTWARE`, check the log first. That usually means the runner fired, then SelfControl failed.
 
 ## Remove
 
@@ -158,6 +186,8 @@ To verify the generated blocklist and end time without starting a block:
 ```
 
 ## Limitations
+
+Unattended scheduled starts are not currently reliable because of SelfControl's macOS authorization/helper flow. This is the main limitation of the project.
 
 Start and end times must be on the same calendar day. Overnight schedules such as `22:00` to `06:00` are not supported as written.
 
